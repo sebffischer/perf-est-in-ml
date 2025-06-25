@@ -1,0 +1,644 @@
+---
+title: "Evaluation of ML Models for Non-Standard Data Structures"
+author: "Dr. Roman Hornung"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+## Clustered Data
+
+Load a simulated dataset with 10 clusters, each containing 25 observations:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Load a previously saved dataset named 'dataclustered' from an R data file
+load("dataclustered.Rda")
+
+# Display the first few rows of the dataset
+head(dataclustered)
+# Columns:
+# y      – the continuous target variable
+# x.1-x.5 – predictor variables (features)
+# index  – cluster/group identifier (e.g., subjects, centers, etc.)
+```
+
+The target variable has cluster-specific means, one covariate has a cluster-specific effect, and one covariate is constant within the clusters.
+
+Load the necessary mlr3 packages:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+library("mlr3")        # Core mlr3 functionality
+library("mlr3verse")   # Includes additional learners
+```
+
+Initialize the regression task and configure mlr3-specific components:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Set seed for reproducibility
+set.seed(1234)
+
+# Suppress detailed messages from mlr3 during resampling
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# Create an mlr3 regression task with 'y' as target
+task <- as_task_regr(dataclustered, target = "y")
+
+# Tell mlr3 that 'index' should *not* be used as a feature
+# It's only used later for grouping
+task$set_col_roles(cols = "index", remove_from = "feature")
+
+# Create a repeated cross-validation (CV) object: 10 repeats of 5-fold CV
+cvobj <- rsmp("repeated_cv", repeats = 10, folds = 5)
+
+# Instantiate the CV splits on the current task: This creates the splits into
+# training and test data for the repeated CV
+cvobj$instantiate(task)
+```
+
+Define two regression learners to be used:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# - Random forest using the 'ranger' R package
+# - Linear model using base R's lm()
+learner_temp_rf <- lrn("regr.ranger")
+learner_temp_lm <- lrn("regr.lm")
+```
+
+Standard (non-grouped) cross-validation (CV) (**not** recommended):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Apply random forest with standard CV
+result_cvobj <- resample(task = task, learner = learner_temp_rf, resampling = cvobj)
+# Aggregate mean squared error (MSE) across all folds
+mse_cvobj_rf <- result_cvobj$aggregate(msr("regr.mse"))
+
+# Apply linear model with standard CV
+result_cvobj <- resample(task = task, learner = learner_temp_lm, resampling = cvobj)
+mse_cvobj_lm <- result_cvobj$aggregate(msr("regr.mse"))
+```
+
+Grouped CV (recommended):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Now assign the grouping structure to the task
+# This ensures that entire clusters (defined by 'index') are kept together in CV folds
+task$col_roles$group = "index"
+
+# Re-instantiate the resampling – now taking the group structure into account
+cvobj$instantiate(task)
+
+# Apply random forest with grouped CV
+result_cvobjg <- resample(task = task, learner = learner_temp_rf, resampling = cvobj)
+mse_cvobj_gr_rf <- result_cvobjg$aggregate(msr("regr.mse"))
+
+# Apply linear model with grouped CV
+result_cvobjg <- resample(task = task, learner = learner_temp_lm, resampling = cvobj)
+mse_cvobj_gr_lm <- result_cvobjg$aggregate(msr("regr.mse"))
+```
+
+Print MSEs of standard and grouped CV for comparison:
+
+```{r}
+# Random forest: non-grouped vs. grouped CV
+mse_cvobj_rf     # MSE without respecting cluster structure
+mse_cvobj_gr_rf  # MSE with grouped CV
+
+# Linear model: non-grouped vs. grouped CV
+mse_cvobj_lm     # MSE without respecting cluster structure
+mse_cvobj_gr_lm  # MSE with grouped CV
+```
+
+## Unequal Sampling Probabilities
+
+Load the simulated population data and draw the sample available to the analyst:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Set seed for reproducibility
+set.seed(1234)
+
+# Load the full population (not available to the analyst in practice)
+load("population_data.Rda")
+
+# Number of units in population
+N <- nrow(population_data)
+
+# Simulate unit size (positively correlated with target variable y)
+# Used to create inclusion probabilities for proportional to size (PPS) sampling
+valid <- FALSE
+while (!valid) {
+  u <- population_data$y + rnorm(N)
+  if (all(u > 0)) valid <- TRUE
+}
+
+# Sample size (1% of the population)
+n <- N / 100
+
+# Compute inclusion probabilities for PPS sampling
+probs_pop <- n * u / sum(u)
+
+# Draw a sample with probabilities proportional to size
+ids <- sample(1:N, n, prob = probs_pop)
+train_data <- population_data[ids, ]
+
+# Inclusion probabilities of sampled units
+probs_sample <- probs_pop[ids]
+
+# Display the first few rows of the dataset
+head(train_data)
+```
+
+Load the required mlr3 packages:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+library("mlr3")
+library("mlr3learners")
+```
+
+Initialize the regression task and configure mlr3-specific components:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Suppress logging output from mlr3
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# Create regression task from the sampled data
+task <- as_task_regr(y ~ ., data = train_data)
+
+# Define 5-fold CV repeated 10 times
+nrepeats <- 10
+cvobj <- rsmp("repeated_cv", folds = 5, repeats = nrepeats)
+cvobj$instantiate(task)
+
+# Choose learners (we'll process them one at a time)
+learner_lm <- lrn("regr.lm")
+learner_rf <- lrn("regr.ranger")
+```
+
+Apply CV to linear model to estimate the MSE with and without Horvitz-Thompson correction:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+result_cv_lm <- resample(task = task, learner = learner_lm, resampling = cvobj)
+
+# Standard MSE (no correction; *not* recommended)
+mse_cv_lm <- result_cv_lm$aggregate(msr("regr.mse"))
+
+# Horvitz-Thompson (HT)-corrected MSE (recommended)
+nfolds <- length(result_cv_lm$predictions())
+error_lm <- numeric(nfolds)
+
+for (i in 1:nfolds) {
+  pred <- result_cv_lm$predictions()[[i]] # mlr3 Prediction object for fold i
+  y_true <- pred$response
+  y_pred <- pred$truth
+  w <- probs_sample[pred$row_ids]
+  error_lm[i] <- sum((w^-1) * (y_true - y_pred)^2) / N
+}
+
+# Sum and divide by the number of repetitions of the CV
+mse_cv_corr_lm <- sum(error_lm) / nrepeats
+```
+
+Apply CV to random forests to estimate the MSE with and without Horvitz-Thompson correction:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+result_cv_rf <- resample(task = task, learner = learner_rf, resampling = cvobj)
+
+# Standard MSE (no correction; *not* recommended)
+mse_cv_rf <- result_cv_rf$aggregate(msr("regr.mse"))
+
+# HT-corrected MSE (recommended)
+nfolds <- length(result_cv_rf$predictions())
+error_rf <- numeric(nfolds)
+
+for (i in 1:nfolds) {
+  pred <- result_cv_rf$predictions()[[i]] # mlr3 Prediction object for fold i
+  y_true <- pred$response
+  y_pred <- pred$truth
+  w <- probs_sample[pred$row_ids]
+  error_rf[i] <- sum((w^-1) * (y_true - y_pred)^2) / N
+}
+
+# Sum and divide by the number of repetitions of the CV
+mse_cv_corr_rf <- sum(error_rf) / nrepeats
+```
+
+Print MSEs of CV with and without Horvitz-Thompson correction:
+
+```{r}
+mse_cv_lm         # Standard CV (LM)
+mse_cv_corr_lm    # HT-corrected CV (LM)
+
+mse_cv_rf         # Standard CV (RF)
+mse_cv_corr_rf    # HT-corrected CV (RF)
+```
+
+## Concept Drift
+
+![Employment rates in Germany separated by year. The figure displays the employment rates overall and separately by gender and age group. Because the employment rate is available quarterly, the upper boxplots represent 24 observations ($4 \times 2 \times 3$), the middle boxplots represent 12 observations ($4 \times 3$), and the lower boxplots represent 8 observations ($4 \times 2$). The square brackets in the upper panel indicate the different seasons.](Figure_conc_drift.png){width="100%" fig-align="center"}
+
+Load and inspect preprocessed real-world data: quarterly employment rates in Germany, broken down by gender and age group, from 2005 to 2023:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+load("dataconcdrift.Rda")
+
+# Display the first few rows of the dataset
+head(dataconcdrift)
+
+```
+
+Store the year information separately and remove it from the data:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+years <- dataconcdrift$Year
+dataconcdrift$Year <- NULL
+
+# Note:
+# The data is segmented into "seasons" of two consecutive years each.
+# The first season is an exception and spans three years (2005–2007).
+```
+
+Initialize the regression task and configure mlr3-specific components:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Set seed for reproducibility
+set.seed(1234)
+
+# Load required packages:
+library("mlr3")
+library("mlr3verse")
+
+# Suppress unnecessary log messages from mlr3
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# Define the regression learners:
+learner_temp_rf <- lrn("regr.ranger")  # Random forest
+learner_temp_lm <- lrn("regr.lm")      # Linear regression
+
+# Define the regression task:
+task <- as_task_regr(dataconcdrift, target = "empl_rate")
+```
+
+Standard repeated CV (**not** recommended; 7 folds x 10 repeats):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Create a repeated CV object
+cv <- rsmp("repeated_cv", repeats = 10, folds = 7)
+
+# Instantiate the CV splits on the current task 
+cv$instantiate(task)
+
+# CV for random forests
+result_cv <- resample(task = task, learner = learner_temp_rf, resampling = cv)
+mse_cv_rf <- result_cv$aggregate(msr("regr.mse"))
+
+# CV for linear model
+result_cv <- resample(task = task, learner = learner_temp_lm, resampling = cv)
+mse_cv_lm <- result_cv$aggregate(msr("regr.mse"))
+```
+
+Out-of-sample validation (recommended!) without buffer: Train on first 8 seasons (2005–2021), test on last season (2022–2023):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Train the random forest on years 2005 to 2021 (i.e., seasons 1 to 8)
+learner_temp_rf$train(task, row_ids = which(years %in% 2005:2021))
+
+# Predict employment rates for the final season (2022–2023)
+predictions <- learner_temp_rf$predict(task, row_ids = which(years %in% 2022:2023))
+
+# Compute the MSE
+mse_TSholdout_1s_rf <- predictions$score(msr("regr.mse"))
+
+# Repeat the same for the linear model:
+learner_temp_lm$train(task, row_ids = which(years %in% 2005:2021))
+predictions <- learner_temp_lm$predict(task, row_ids = which(years %in% 2022:2023))
+mse_TSholdout_1s_lm <- predictions$score(msr("regr.mse"))
+```
+
+Out-of-sample validation (recommended!) with buffer: Train on first 7 seasons (2005–2019), test on last season (2022–2023):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Train the random forest on years 2005 to 2019 (seasons 1 to 7)
+learner_temp_rf$train(task, row_ids = which(years %in% 2005:2019))
+
+# Predict on the final season (2022–2023), skipping 2020–2021
+predictions <- learner_temp_rf$predict(task, row_ids = which(years %in% 2022:2023))
+
+# Compute the MSE
+mse_TSholdout_2s_rf <- predictions$score(msr("regr.mse"))
+
+# Repeat for the linear model:
+learner_temp_lm$train(task, row_ids = which(years %in% 2005:2019))
+predictions <- learner_temp_lm$predict(task, row_ids = which(years %in% 2022:2023))
+mse_TSholdout_2s_lm <- predictions$score(msr("regr.mse"))
+```
+
+Print MSEs of all variants for comparison:
+
+```{r}
+# Random forests: CV and out-of-sample validation without and with buffe
+mse_cv_rf           # MSE with standard CV
+mse_TSholdout_1s_rf # MSE with out-of-sample validation without buffer
+mse_TSholdout_2s_rf # MSE with out-of-sample validation with buffer 
+
+# Linear models: CV and out-of-sample validation without and with buffe
+mse_cv_lm           # MSE with standard CV
+mse_TSholdout_1s_lm # MSE with out-of-sample validation without buffer
+mse_TSholdout_2s_lm # MSE with out-of-sample validation with buffer 
+```
+
+## Hierarchically Structured Outcomes
+
+Load a simulated dataset with a hierarchically structured outcome:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Load the dataset (assumed to include a hierarchical class structure in 'y')
+load("datahier.Rda")
+
+# Display the first few rows of the dataset
+head(datahier)
+```
+
+Load the required packages:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+library("mlr3")       # Core mlr3 functionality
+library("hierclass")  # Provides top-down hierarchical classifier and hierarchy-aware measures
+```
+
+The package `hierclass` loaded above is not available on CRAN but can be installed directly from GitHub via the repository <https://github.com/RomanHornung/hierclass>. To install it, use the following command:
+
+``` r
+remotes::install_github("RomanHornung/hierclass")
+```
+
+The `hierclass` package implements top-down hierarchical classification using random forests as local classifiers. This functionality is provided as an `mlr3` learner, allowing easy integration into `mlr3` workflows. In addition, the package offers a set of hierarchical performance measures---hierarchical F-score, hierarchical precision, hierarchical recall, (weighted) shortest path distance, and H-loss---which are available as `mlr3` measures.
+
+To make the data compatible with the `hierclass` package, each entry of the target variable must start with the broadest category, followed by a dot ("."), followed by the second-broadest category, followed by a dot ("."), and so on. Consider, for example, the species categorization described above. Here, an entry for a human would look like this: "animalia.chordata.mammalia.primates.hominidae.homo.sapien".
+
+Initialize the regression task and configure mlr3-specific components:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Suppress mlr3 logging output for cleaner console output
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# Create a classification task with target 'y' and all remaining columns as features
+task <- as_task_classif(y ~ ., data = datahier)
+
+# This learner performs classification exploiting the class hierarchy,
+# using random forests for node-level decisions
+learner <- lrn("classif.topdown")
+```
+
+Standard repeated CV (**not** recommended; 5 folds x 2 repeats):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Set seed for reproducibility
+set.seed(1234)
+
+# Create a repeated CV object: 2 repeats of 5-fold CV
+cv <- rsmp("repeated_cv", repeats = 2, folds = 5)
+
+# Instantiate the CV splits on the current task 
+cv$instantiate(task)
+
+# Run the CV for the top-down classifier
+result_cv <- resample(task = task, learner = learner, resampling = cv)
+
+# Aggregate performance across folds using a variety of hierarchical and flat measures:
+CV_vals <- c(
+  result_cv$aggregate(msr("classif.hierfbeta", type = "micro")),  # Hierarchical F-score (micro-averaged)
+  result_cv$aggregate(msr("classif.hierpr", type = "micro")),     # Hierarchical precision (micro)
+  result_cv$aggregate(msr("classif.hierre", type = "micro")),     # Hierarchical recall (micro)
+  result_cv$aggregate(msr("classif.hloss")),                      # H-loss (hierarchical loss)
+  result_cv$aggregate(msr("classif.spath")),                      # (Weighted) shortest path distance
+  result_cv$aggregate(msr("classif.acc"))                         # Standard (flat) accuracy
+)
+```
+
+Stratified repeated CV, using target variable for stratification (recommended):
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Use the same seed again
+set.seed(1234)
+
+# Use target variable for stratification
+task$col_roles$stratum <- task$target_names 
+
+# Instantiate the CV splits after stratification
+cv$instantiate(task)
+
+# Run CV again, now stratified
+result_cv <- resample(task = task, learner = learner, resampling = cv)
+
+# Aggregate hierarchical and flat performance measures again
+stratCV_vals <- c(
+  result_cv$aggregate(msr("classif.hierfbeta", type = "micro")),
+  result_cv$aggregate(msr("classif.hierpr", type = "micro")),
+  result_cv$aggregate(msr("classif.hierre", type = "micro")),
+  result_cv$aggregate(msr("classif.hloss")),
+  result_cv$aggregate(msr("classif.spath")),
+  result_cv$aggregate(msr("classif.acc"))
+)
+```
+
+Summarize and compare the results:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Combine both sets of evaluation results into a data frame
+metrics <- data.frame(
+  measure = c("hierf_micro", "hierpr_micro", "hierre_micro", "hloss", "spath", "acc"),
+  CV = CV_vals,
+  strat_CV = stratCV_vals
+)
+rownames(metrics) <- NULL
+
+# Print performance metrics for both CV strategies
+metrics
+```
+
+## Spatial Data
+
+Here, we will use the `ecuador` dataset available in the R package `mlr3spatiotempcv`, which implements various spatial CV procedures, where many of them will be used in the below code. The dataset contains georeferenced points in southern Ecuador labeled by whether a rainfall-triggered shallow landslide occurred (`slides = TRUE/FALSE`). Each point includes terrain attributes such as elevation, slope, curvature, and catchment area, derived from high-resolution digital elevation models.
+
+Load the required packages:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+library("mlr3")
+library("mlr3learners")
+library("mlr3spatiotempcv")
+library("data.table")
+library("sf")
+```
+
+For two of the resampling strategies, we generate artificial grouping variables. The "Single split into training and test data" approach requires a categorical variable (`train_test`) that separates the observation space into two regions---one used for training the model and the other for evaluating its predictive performance. The "Partitioning based on geographical units" approach needs a categorical variable (`location`) that assigns each observation to one of several distinct spatial areas (in our case, 8). We create these two variables by applying k-means clustering to the spatial coordinates: with `k = 2` to define `train_test`, and `k = 8` to define `location`. In real-world applications, however, these groupings would correspond to meaningful geographic units (e.g. administrative districts).
+
+Prepare the data and create the variables `train_test` and `location`:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+ecuador2 <- ecuador
+
+# Remove redundant covariate (log.carea contains the same information)
+ecuador2$carea <- NULL
+
+# Convert to sf object
+ecuador2_sf <- st_as_sf(ecuador2, coords = c("x", "y"), crs = 32717)
+
+# Add 'train_test' and 'location' to the data set:
+coords <- st_coordinates(ecuador2_sf)
+set.seed(1234)
+clusters_2 <- kmeans(coords, centers = 2)$cluster
+clusters_8 <- kmeans(coords, centers = 8)$cluster
+ecuador2_sf$train_test <- factor(ifelse(clusters_2 == 1, "train", "test"))
+ecuador2_sf$location <- factor(clusters_8)
+
+# Display the first few rows of the dataset
+head(ecuador2_sf)
+```
+
+Configure spatial elements and mlr3-specific components, and initialize the spatial classification task:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# Set seed for reproducibility:
+set.seed(1234)
+
+# Remove train_test and location from covariates for modeling
+ecuador_model_data <- st_drop_geometry(ecuador2_sf)
+ecuador_model_data$train_test <- NULL
+ecuador_model_data$location <- NULL
+
+# Suppress logging output from mlr3
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# Combine modeling data and geometry into a new sf object
+ecuador_model_sf <- st_sf(ecuador_model_data, geometry = st_geometry(ecuador2_sf))
+
+# Then create the task from this sf object
+task <- as_task_classif_st(
+  ecuador_model_sf,
+  target = "slides",
+  positive = "TRUE",
+  id = "ecuador_custom"
+)
+
+# Define learner (logistic regression) and measure (area under the ROC curve)
+learner <- lrn("classif.log_reg", predict_type = "prob")
+measure <- msr("classif.auc")
+```
+
+Make a container in which the results will stored:
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+results <- data.table(method = character(), score = numeric())
+```
+
+### (1) Single Split into Training and Test Data
+
+In this most basic approach, we divide the dataset once into two regions, one used for training the model and the other for evaluating its predictive performance. This is, for example, useful when one wants to evaluate model performance on a spatially distinct area, such as a newly surveyed region. In the below code, the variable `train_test`, created earlier, indicates which observations belong to the training and test region.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+train_idx <- which(ecuador2_sf$train_test == "train")
+test_idx  <- which(ecuador2_sf$train_test == "test")
+resampling_holdout <- rsmp("custom")
+resampling_holdout$instantiate(task, train_sets = list(train_idx), test_sets = list(test_idx))
+rr1 <- resample(task, learner, resampling_holdout)
+
+results <- rbind(results, data.table(method = "train_test_split", score = rr1$aggregate(measure)))
+```
+
+### (2) Rectangular Tiles Corresponding to Folds
+
+This resampling approach divides the spatial domain into rectangular tiles using a fixed spatial resolution (set via `dsplit` or `nsplit`). Each tile is used once as a test set.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs2 <- rsmp("spcv_tiles", dsplit = c(1500L, 1500L))  # each tile ~1500x1500 meters
+rs2$instantiate(task)
+rr2 <- resample(task, learner, rs2)
+
+results <- rbind(results, data.table(method = "tiles_fixed", score = rr2$aggregate(measure)))
+```
+
+### (3) Rectangular Tiles Randomly Assigned to Folds
+
+In this approach, the spatial domain is again divided into a regular grid, but the resulting tiles are randomly assigned to folds.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs3 <- rsmp("spcv_block", rows = 5, cols = 5, folds = 10)
+rs3$instantiate(task)
+rr3 <- resample(task, learner, rs3)
+
+results <- rbind(results, data.table(method = "tiles_random", score = rr3$aggregate(measure)))
+```
+
+### (4) K-means Clustering in Coordinate Space
+
+Here, folds are defined via k-means clustering on the spatial coordinates. This creates spatially compact, data-driven groupings that are not tied to a fixed grid.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs4 <- rsmp("spcv_coords", folds = 5)
+rs4$instantiate(task)
+rr4 <- resample(task, learner, rs4)
+
+results <- rbind(results, data.table(method = "clustering_coordinates", score = rr4$aggregate(measure)))
+```
+
+### (5) K-means Clustering in Covariate Space
+
+Instead of using spatial coordinates, this method uses all numerical covariates to define the folds via k-means clustering. It aims to evaluate generalization to new (e.g. environmental or terrain) conditions.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs5 <- rsmp("spcv_env", folds = 5)
+rs5$instantiate(task)
+rr5 <- resample(task, learner, rs5)
+
+results <- rbind(results, data.table(method = "clustering_covariates", score = rr5$aggregate(measure)))
+```
+
+### (6) Leave-One-Disc-Out CV Without Buffer
+
+This method repeatedly withholds a randomly located disc-shaped region of a certain radius for testing. The remaining points form the training set.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs6 <- rsmp("spcv_disc", radius = 1000, buffer = 0, folds = 100)
+rs6$instantiate(task)
+rr6 <- resample(task, learner, rs6)
+
+results <- rbind(results, data.table(method = "leave_disc", score = rr6$aggregate(measure)))
+```
+
+### (7) Leave-One-Disc-Out CV With Buffer
+
+This variation adds a buffer zone of a certain width around each disc. Buffer zones should only be employed when predictions are intended for new areas, where the distance to these areas exceeds the distances between neighboring observations in the training data.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+rs7 <- rsmp("spcv_disc", radius = 800, buffer = 200, folds = 100)
+rs7$instantiate(task)
+rr7 <- resample(task, learner, rs7)
+
+results <- rbind(results, data.table(method = "leave_disc_buffer", score = rr7$aggregate(measure)))
+```
+
+### (8) Partitioning Based on Geographical Units
+
+This method can be used in situations where observations are grouped into predefined spatial units (e.g., administrative regions). In each iteration, one spatial unit is used for testing, and the rest for training. In the below code, the variable `location`, created earlier, defines these groups.
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+# IMPORTANT: The variable 'location' must not be included as a covariate in the task
+# ('location' was already removed before the task was created above).
+# In this resampling strategy, each fold corresponds to one unique value of 'location'.
+# Therefore, during training, the model will *not* see the level of 'location' that appear 
+# in the test fold.
+# If 'location' were included as a covariate (i.e., a factor), this would cause a failure 
+# at prediction time, since the model cannot handle previously unseen factor levels. 
+
+rs8 <- rsmp("custom_cv")
+rs8$instantiate(task, f = ecuador2_sf$location)
+rr8 <- resample(task, learner, rs8)
+
+results <- rbind(results, data.table(method = "geo_units", score = rr8$aggregate(measure)))
+```
+
+### Final Comparison of Results
+
+```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
+print(results)
+```
