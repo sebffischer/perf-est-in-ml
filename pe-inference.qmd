@@ -1,0 +1,240 @@
+---
+title: "Inference on the GE with mlr3"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r, include = FALSE}
+lgr::get_logger("mlr3")$set_threshold("warn")
+```
+
+In this notebook, we will learn how to performance inference on the *Generalization Error* (GE) using the `mlr3` ecosystem and its [`mlr3inferr`](https://github.com/mlr-org/mlr3inferr) extension.
+The package provides 5 methods (implemented as `mlr3::Measure`s) to construct confidence intervals for the generalization error.
+
+To follow this tutorial, you need to install the following packages:
+
+```{r, eval = FALSE}
+install.packages(c(
+  "mlr3",
+  "mlr3inferr",
+  "mlr3pipelines",
+  "ggplot2"
+))
+```
+
+As an example task for this tutorial, we will be using the *german credit* classification example task that comes with `mlr3`.
+It is a binary classification problem with 1000 observations that involves predicting whether a loan applicant is a good or bad credit risk based on 20 attributes, such as personal information and financial history.
+
+
+```{r}
+library(mlr3)
+task = tsk("german_credit")
+task
+```
+
+As the learning algorithm, we will go with a simple classification tree with standard hyperparamter configurations.
+
+```{r}
+learner = lrn("classif.rpart")
+```
+
+In order to avoid any errors (like unseen factor levels), we perform some preprocessing before training the logistic regression.
+For more information, see `help(mlr_graphs_robustify)`.
+
+```{r}
+library(mlr3pipelines)
+learner = as_learner(po("imputehist") %>>% learner)
+learner$id = "log_reg"
+```
+
+In order to be able to apply probability-based measures, we instruct the `Learner` to make probability predictions:
+
+```{r}
+learner$predict_type = "prob"
+```
+
+## Using the Inference Methods
+
+### Simple Holdout Method
+
+In order to apply the simple Holdout-based CI method, we define the resampling method, where we use $90%$ of the data for training, and run the experiment:
+
+```{r}
+rsmp_holdout = rsmp("holdout", ratio = 0.9)
+rr_holdout = resample(task, learner, rsmp_holdout)
+rr_holdout
+```
+
+In order to construct the confidence interval, we need to define the corresponding CI measure.
+It has a construction argument `measure`, which is another `mlr3::Measure`.
+Because this specific CI method only works with pointwise loss functions, we can e.g. not use the AUC measure:
+
+```{r, error = TRUE}
+library(mlr3inferr)
+msr("ci.holdout", measure = msr("classif.auc"))
+```
+
+Whether a measure is based on a pointwise loss function can be checked by consulting its `$obs_loss` field:
+
+```{r}
+msr("classif.auc")$obs_loss
+msr("classif.ce")$obs_loss
+```
+
+Note that you can access the help page of a measure via `msr("<id>")$help()`.
+
+:::{.callout-note}
+Some methods (like RMSE for regression) are strictly speaking not based on pointwise loss functions, because of the square-root after the aggregation.
+In this case, the measure additionally has a *trafo* defined that is applied after aggregating the pointwise losses.
+The confidence interval for such a loss function is obtained using the *Delta Method*.
+
+```{r}
+rmse = msr("regr.rmse")
+rmse$trafo
+```
+
+Also note that currently not all `mlr3::Measure`s that are based on pointwise loss functions also implement it.
+If something important is missing, don't hesitate to [open an issue in `mlr3measures`](https://github.com/mlr-org/mlr3measures/issues/new).
+:::
+
+Below, we construct the CI measure for the classification error measure, i.e. the zero-one loss function.
+We set the $\alpha$ level to 0.05 (which is also the default):
+
+```{r}
+msr_ci_holdout = msr("ci.holdout",
+  measure = msr("classif.ce"),
+  alpha = 0.05
+)
+```
+
+In order to construct a confidence interval, we can now simply call `$aggregate()` on the resample result and pass the CI measure:
+The result is a named vector with names `c("<msr-id>", "<msr-id>.lower", "<msr-id>.upper")`.
+
+```{r}
+ci_holdout = rr_holdout$aggregate(msr_ci_holdout)
+ci_holdout
+```
+
+
+### Corrected T
+
+To apply the *Corrected T* method, we need to use `rsmp("subsampling")` for our resample experiment.
+We use 90% of the data for training and conduct 25 repetitions:
+
+```{r}
+rsmp_subs = rsmp("subsampling",
+  ratio = 0.9,
+  repeats = 25
+)
+rsmp_subs
+rr_subs = resample(task, learner, rsmp_subs)
+```
+
+We could now again define the `msr("ci.cor_t")` and pass it to the resample result's `$aggregate()` method.
+Another option is to use the `msr("ci")` measure, which auto-detects the resampling method and applies the appriopriate CI method:
+
+```{r}
+ci = msr("ci", measure = msr("classif.ce"))
+ci_cort = rr_subs$aggregate(ci)
+ci_cort
+```
+
+For this resampling scheme, we could also use the AUC measure, which is not based on pointwise losses:
+
+```{r}
+rr_subs$aggregate(msr("ci.cor_t", measure = msr("classif.auc")))
+```
+
+### Conservative Z
+
+To use the *Conservative Z* method, the resample experiment needs to use the *Paired Subsampling* resampling scheme.
+It allows to define the repetitions of the Subsampling scheme (`repeats_in`), how often to split the data into two halves (`repeats_out`), as well as the `ratio`.
+The total number of resampling iterations (i.e. train-test splits) can be accessed via the `$iters` field.
+The default configuration of Paired Subsampling is the one suggested by Nadeau and Bengio (1999) where they introduced the method.
+It uses 315 iterations, which can be prohibitively expensive, especially when used in comination with hyperparameter tuning.
+
+```{r}
+rsmp_paired_subs = rsmp("paired_subsampling")
+rsmp_paired_subs
+rsmp_paired_subs$iters
+rr_paired_subs = resample(task, learner, rsmp_paired_subs)
+ci_conz = rr_paired_subs$aggregate(ci)
+ci_conz
+```
+
+Just like for the previous method, we can also use the AUC measure here: 
+
+```{r}
+rr_paired_subs$aggregate(msr("ci.con_z", measure = msr("classif.auc")))
+```
+
+### Nested CV
+
+To use the *Nested CV* method, we require the corresponding resampling scheme.
+It has two hyperparameters, namely the number of outer repetitions and the number of folds.
+The number of iterations is linear in the former, but quadratically in the latter.
+
+```{r}
+rsmp_ncv = rsmp("nested_cv", repeats = 20, folds = 5)
+rr_ncv = resample(task, learner, rsmp_ncv)
+ci_ncv = rr_ncv$aggregate(ci)
+ci_ncv
+```
+
+### Wald CV
+
+Finally, there is the "naive" method for the Cross-Validation:
+
+```{r}
+rsmp_cv = rsmp("cv", folds = 10)
+rr_cv = resample(task, learner, rsmp_cv)
+ci_cv = rr_cv$aggregate(ci)
+ci_cv
+```
+
+## Comparison of Methods
+
+```{r, include = FALSE}
+#| code-fold: true
+library(data.table)
+tbl = as.data.table(rbind(
+  ci_holdout,
+  ci_cv,
+  ci_cort,
+  ci_conz,
+  ci_ncv
+))
+set(tbl, j = "method", value = c("holdout", "cv", "cort", "conz", "ncv"))
+msr_time = msr("time_both", aggregator = sum)
+set(tbl, j = "runtime", value = sapply(list(
+  rr_paired_subs, rr_holdout, rr_cv, rr_subs, rr_ncv),
+  function(rr) rr$aggregate(msr_time)
+))
+```
+
+In the figure below, we show all CIs side by side:
+
+```{r}
+#| code-fold: true
+library(ggplot2)
+ggplot(tbl, aes(x = method, y = classif.ce)) +
+  geom_pointrange(aes(ymin = classif.ce.lower, ymax = classif.ce.upper), fatten = 1.4) +
+  coord_flip() +                        
+  labs(x = NULL, y = "Classification Error") +
+  theme_minimal()
+```
+
+However, the different resampling schemes had different runtime requirements:
+
+```{r}
+#| code-fold: true
+ggplot(tbl, aes(x = method, y = runtime)) + 
+  geom_point() +
+  theme_bw()
+```
+
+
+
+
+

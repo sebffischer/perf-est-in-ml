@@ -1,0 +1,260 @@
+---
+title: "Machine Learning in R"
+author: "Sebastian Fischer"
+format:
+  html:
+    embed-resources: true
+---
+
+## `mlr3` Recap
+
+Before diving into `mlr3torch`, we will briefly review the core building blocks of the `mlr3` machine learning framework. For reference, we recommend the [mlr3 book](https://mlr3book.mlr-org.com/) that explains the `mlr3` framework in more detail. Additionally, the [mlr3 website](https://mlr-org.com/) contains more tutorials and overviews.
+
+### Task
+
+A task is a machine learning problem on a dataset. It consists of the data itself and some metadata such as the features or the target variable. To create an example task that comes with `mlr3`, we can use the `tsk()` function:
+
+```{r}
+library(mlr3)
+set.seed(42)
+tsk("iris")
+```
+
+```{r, include = FALSE}
+lgr::get_logger("mlr3")$set_threshold("warn")
+```
+
+To create a custom `Task` from a `data.frame`, we can use the `as_task_<type>` converters:
+```{r}
+head(iris)
+tsk_iris <- as_task_classif(iris, id = "iris", target = "Species")
+tsk_iris
+```
+
+::: {.callout-tip}
+To get the help page for an `mlr3` object, you can call `tsk_iris$help()`.
+:::
+
+You can access the data of a task using the `$data()` method, which accepts arguments `rows` and `cols` to select specific rows and columns.
+
+```{r}
+tsk_iris$data(rows = 1:5, cols = c("Sepal.Length", "Sepal.Width"))
+```
+
+Using the `mlr3viz` extension, we can get an overview of the target distribution:
+
+```{r}
+library(mlr3viz)
+autoplot(tsk_iris)
+```
+
+### Learner
+
+A learner is a machine learning algorithm that can be `$train()`ed on a `Task` and be used to make `$predict()`ions on it.
+An overview of all learners is shown on our [website](https://mlr-org.com/learners.html).
+We can construct one by passing the identifier of the learner to the `lrn()` function.
+
+```{r}
+lrn_tree <- lrn("classif.rpart")
+```
+
+Next, we need to split the data into a training and test set and apply the learner on the former.
+
+```{r}
+split <- partition(tsk_iris, ratio = 0.8)
+lrn_tree$train(tsk_iris, row_ids = split$train)
+```
+
+The trained model can be accessed via the `$model` slot of the learner:
+```{r}
+print(lrn_tree$model)
+```
+
+To make predictions on the test set, we can use the `$predict()` method of the learner:
+```{r}
+predictions <- lrn_tree$predict(tsk_iris, row_ids = split$test)
+```
+
+To make predictions on `data.frame`s, we can use the `$predict_newdata()` method of the learner:
+```{r}
+new_data <- iris[1:2, ]
+lrn_tree$predict_newdata(new_data)
+```
+
+### Performance Evaluation
+
+To assess the quality of the predictions, we can use a `Measure`. `mlr3` comes with many predefined measures, and we can construct them by passing the name of the measure to the `msr()` function. Below, we construct the mean classification accuracy measure -- which can only be applied to classification tasks -- and use it to evaluate the predictions.
+
+```{r}
+acc <- msr("classif.acc")
+predictions$score(acc)
+```
+
+For more elaborate evaluation strategies, we can use `rsmp()` to define a `Resampling` strategy that can be executed using `resample()`.
+```{r}
+rsmp_cv <- rsmp("cv", folds = 3)
+
+rr <- resample(
+  task       = tsk_iris,
+  learner    = lrn_tree,
+  resampling = rsmp_cv
+)
+
+# Aggregate the results
+rr$aggregate(msr("classif.acc"))
+```
+
+### Hyperparameter Tuning
+
+Hyperparameter tuning is an essential process in machine learning to optimize the performance of models by selecting the best combination of hyperparameters. In the `mlr3` framework, hyperparameter tuning is facilitated by the [`mlr3tuning`](https://github.com/mlr-org/mlr3tuning) extension.
+
+We will now demonstrate how to tune the hyperparameters of the `classif.rpart` learner.
+
+1. **Define the Search Space**: Specify the range and distribution of hyperparameters to explore.
+
+   ```{r, message = FALSE}
+   library(mlr3tuning)
+   lrn_tree$configure(
+     cp = to_tune(lower = 0.001, upper = 0.1),
+     maxdepth = to_tune(lower = 1, upper = 30)
+   )
+   ```
+
+2. **Choose a Resampling Strategy**: Determine how to evaluate each hyperparameter configuration's performance.
+
+   ```{r}
+   rsmp_tune <- rsmp("cv", folds = 3)
+   ```
+
+3. **Select a Tuner**: Decide on the algorithm that will search through the hyperparameter space.
+
+   ```{r}
+   tuner <- tnr("random_search")
+   ```
+
+4. **Select a Measure**: Define the metric to optimize during tuning.
+
+   ```{r}
+   msr_tune <- msr("classif.acc")
+   ```
+
+5. **Execute Tuning**: Run the tuning process to find the optimal hyperparameters. Here we also specify our budget of 10 evaluations.
+
+   ```{r}
+   tune_result <- tune(
+     task = tsk_iris,
+     learner = lrn_tree,
+     resampling = rsmp_tune,
+     measure = msr_tune,
+     tuner = tuner,
+     term_evals = 10L
+   )
+   ```
+
+6. **Apply the Best Hyperparameters**: Update the learner with the best-found hyperparameters and retrain the model.
+
+   ```{r}
+   lrn_tree$param_set$values <- tune_result$result_learner_param_vals
+   lrn_tree$train(tsk_iris)
+   ```
+
+::: {.callout-note}
+## Quiz: Tuning Performance
+
+**Question 1**: Estimating the performance of a tuned model:
+
+Through the tuning archive, we can access the performance of the best-found hyperparameter configuration.
+
+```{r}
+tune_result$archive$data[order(classif.acc, decreasing = TRUE), ][1, classif.acc]
+```
+
+Do you think this is a good estimate for the performance of the final model? Explain your answer.
+
+<details>
+<summary>Click for answer</summary>
+One reason why we would expect the performance of the final model to be worse than the performance of the best-found hyperparameter configuration is due to *optimization bias*:
+We choose the model configuration with the highest validation performance.
+This selection process biases the result since the chosen model is the best among several trials that are all affected by randomness.
+</details>
+:::
+
+These two steps can also be encapsulated in the `AutoTuner` class, which first finds the best hyperparameters and then trains the model with them.
+
+```{r}
+at <- auto_tuner(
+  learner = lrn_tree,
+  resampling = rsmp_tune,
+  measure = msr_tune,
+  term_evals = 10L,
+  tuner = tuner
+)
+```
+
+The `AutoTuner` can be used just like any other `Learner`.
+To get a valid performance estimate of the tuning process, we can `resample()` it on the task.
+This is called *nested resampling*: the outer resampling is for evaluation and the inner resampling is for tuning.
+
+```{r}
+rr <- resample(tsk_iris, at, rsmp_tune)
+rr$aggregate(acc)
+```
+
+### Learning Pipelines
+
+In many cases, we don't only fit a single learner but a whole learning pipeline.
+Common use cases include the preprocessing of the data, e.g., for imputing missing values, scaling the data, or encoding categorical features, but many other operations are possible.
+The `mlr3` extension [`mlr3pipelines`](https://mlr3pipelines.mlr-org.com/) is a toolbox for defining such learning pipelines.
+Its core building block is the `PipeOp` that can be constructed using the `po()` function.
+
+```{r}
+library(mlr3pipelines)
+pca <- po("pca")
+```
+
+Just like a learner, it has a `$train()` and `$predict()` method, and we can apply it to a `Task` using these methods.
+
+```{r}
+pca$train(list(tsk_iris))
+pca$predict(list(tsk_iris))[[1L]]
+```
+
+Usually, such `PipeOp`s are combined with a `Learner` into a full learning `Graph`.
+This is possible using the `%>>%` chain operator.
+
+```{r}
+library(mlr3pipelines)
+graph <- po("pca") %>>% lrn("classif.rpart")
+print(graph)
+graph$plot(horizontal = TRUE)
+```
+
+The resulting `Graph` can be converted back into a `Learner` using the `as_learner()` function and used just like any other `Learner`.
+
+```{r}
+glrn <- as_learner(graph)
+glrn$train(tsk_iris)
+```
+
+
+### Parallelization
+
+In order to speed up computations in `mlr3`, there are various approaches:
+
+1. Use a `Learner`'s internal parallelization capapabilities, which is independent from `mlr3` and which can be set via the `set_threads()` function.
+1. Use `future` (or soon also `mirai`) to parallelize the execution of a resampling or a benchmark.
+1. Soon it will be possible to use `mirai` as a plug-in replacement for `future`, which is significantly faster.
+1. Use `mlr3batchmark` for parallelization on HPC clusters.
+
+You can read [Chapter 10](https://mlr3book.mlr-org.com/chapters/chapter10/advanced_technical_aspects_of_mlr3.html#sec-parallelization) and [Chapter 11](https://mlr3book.mlr-org.com/chapters/chapter11/large-scale_benchmarking.html#sec-hpc-exec) of the `mlr3` book on that.
+Here, we will briefly demonstrate how to parallelize a resampling using `future`.
+
+In the simplest scenario (no nested parallelization), we only need to call a single functions from future and specify the number of workers:
+
+
+```{r}
+future::plan("multisession", workers = 10)
+rr = resample(tsk_iris, lrn_tree, rsmp("cv", folds = 10))
+```
+
+Note that you want to pay attention to any NEWS about the `mirai` integration to `mlr3`, which will really simplify some configuration options and make everything faster.
