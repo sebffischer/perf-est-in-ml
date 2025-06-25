@@ -1,5 +1,5 @@
 ---
-title: "Evaluation of ML Models for Non-Standard Data Structures"
+title: "Evaluation of Machine Learning Models for Non-Standard Data Structures"
 author: "Dr. Roman Hornung"
 format:
   html:
@@ -78,7 +78,7 @@ result_cvobj <- resample(task = task, learner = learner_temp_lm, resampling = cv
 mse_cvobj_lm <- result_cvobj$aggregate(msr("regr.mse"))
 ```
 
-Grouped CV (recommended):
+Grouped CV (**recommended!**):
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Now assign the grouping structure to the task
@@ -179,10 +179,10 @@ Apply CV to linear model to estimate the MSE with and without Horvitz-Thompson c
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 result_cv_lm <- resample(task = task, learner = learner_lm, resampling = cvobj)
 
-# Standard MSE (no correction; *not* recommended)
+# Standard CV (no correction; *not* recommended)
 mse_cv_lm <- result_cv_lm$aggregate(msr("regr.mse"))
 
-# Horvitz-Thompson (HT)-corrected MSE (recommended)
+# CV with Horvitz-Thompson (HT) correction (recommended!)
 nfolds <- length(result_cv_lm$predictions())
 error_lm <- numeric(nfolds)
 
@@ -206,7 +206,7 @@ result_cv_rf <- resample(task = task, learner = learner_rf, resampling = cvobj)
 # Standard MSE (no correction; *not* recommended)
 mse_cv_rf <- result_cv_rf$aggregate(msr("regr.mse"))
 
-# HT-corrected MSE (recommended)
+# HT-corrected MSE (recommended!)
 nfolds <- length(result_cv_rf$predictions())
 error_rf <- numeric(nfolds)
 
@@ -234,7 +234,7 @@ mse_cv_corr_rf    # HT-corrected CV (RF)
 
 ## Concept Drift
 
-![Employment rates in Germany separated by year. The figure displays the employment rates overall and separately by gender and age group. Because the employment rate is available quarterly, the upper boxplots represent 24 observations ($4 \times 2 \times 3$), the middle boxplots represent 12 observations ($4 \times 3$), and the lower boxplots represent 8 observations ($4 \times 2$). The square brackets in the upper panel indicate the different seasons.](Figure_conc_drift.png){width="100%" fig-align="center"}
+![Employment rates in Germany separated by year. The figure displays the employment rates overall and separately by gender and age group. Because the employment rate is available quarterly, the upper boxplots represent 24 observations ($4 \times 2 \times 3$), the middle boxplots represent 12 observations ($4 \times 3$), and the lower boxplots represent 8 observations ($4 \times 2$). The square brackets in the upper panel indicate the different seasons.](figure_conc_drift.png){width="100%" fig-align="center"}
 
 Load and inspect preprocessed real-world data: quarterly employment rates in Germany, broken down by gender and age group, from 2005 to 2023:
 
@@ -296,7 +296,7 @@ result_cv <- resample(task = task, learner = learner_temp_lm, resampling = cv)
 mse_cv_lm <- result_cv$aggregate(msr("regr.mse"))
 ```
 
-Out-of-sample validation (recommended!) without buffer: Train on first 8 seasons (2005–2021), test on last season (2022–2023):
+Out-of-sample validation (**recommended!**) without buffer: Train on first 8 seasons (2005–2021), test on last season (2022–2023):
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Train the random forest on years 2005 to 2021 (i.e., seasons 1 to 8)
@@ -314,7 +314,7 @@ predictions <- learner_temp_lm$predict(task, row_ids = which(years %in% 2022:202
 mse_TSholdout_1s_lm <- predictions$score(msr("regr.mse"))
 ```
 
-Out-of-sample validation (recommended!) with buffer: Train on first 7 seasons (2005–2019), test on last season (2022–2023):
+Out-of-sample validation (**recommended!**) with buffer: Train on first 7 seasons (2005–2019), test on last season (2022–2023):
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Train the random forest on years 2005 to 2019 (seasons 1 to 7)
@@ -335,12 +335,12 @@ mse_TSholdout_2s_lm <- predictions$score(msr("regr.mse"))
 Print MSEs of all variants for comparison:
 
 ```{r}
-# Random forests: CV and out-of-sample validation without and with buffe
+# Random forests: CV and out-of-sample validation without and with buffer
 mse_cv_rf           # MSE with standard CV
 mse_TSholdout_1s_rf # MSE with out-of-sample validation without buffer
 mse_TSholdout_2s_rf # MSE with out-of-sample validation with buffer 
 
-# Linear models: CV and out-of-sample validation without and with buffe
+# Linear models: CV and out-of-sample validation without and with buffer
 mse_cv_lm           # MSE with standard CV
 mse_TSholdout_1s_lm # MSE with out-of-sample validation without buffer
 mse_TSholdout_2s_lm # MSE with out-of-sample validation with buffer 
@@ -415,7 +415,7 @@ CV_vals <- c(
 )
 ```
 
-Stratified repeated CV, using target variable for stratification (recommended):
+Stratified repeated CV, using target variable for stratification (**recommended!**):
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Use the same seed again
@@ -545,7 +545,7 @@ rr1 <- resample(task, learner, resampling_holdout)
 results <- rbind(results, data.table(method = "train_test_split", score = rr1$aggregate(measure)))
 ```
 
-### (2) Rectangular Tiles Corresponding to Folds
+### (2) Rectangular Tiles Corresponding to Folds ("Leave-One-Block-Out CV")
 
 This resampling approach divides the spatial domain into rectangular tiles using a fixed spatial resolution (set via `dsplit` or `nsplit`). Each tile is used once as a test set.
 
