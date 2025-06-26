@@ -154,7 +154,7 @@ ci_conz = rr_paired_subs$aggregate(ci)
 ci_conz
 ```
 
-Just like for the previous method, we can also use the AUC measure here: 
+Just like for the previous method, we can also use the AUC measure here:
 
 ```{r}
 rr_paired_subs$aggregate(msr("ci.con_z", measure = msr("classif.auc")))
@@ -199,8 +199,8 @@ tbl = as.data.table(rbind(
 set(tbl, j = "method", value = c("holdout", "cv", "cort", "conz", "ncv"))
 msr_time = msr("time_both", aggregator = sum)
 set(tbl, j = "runtime", value = sapply(list(
-  rr_paired_subs, rr_holdout, rr_cv, rr_subs, rr_ncv),
-  function(rr) rr$aggregate(msr_time)
+  rr_holdout, rr_cv, rr_subs, rr_paired_subs, rr_ncv),
+  function(rr) sum(rr$score(msr_time)$time_both)
 ))
 ```
 
@@ -212,16 +212,16 @@ We see that the Holdout method has clearly the widest CI, and that the "naive" C
 library(ggplot2)
 ggplot(tbl, aes(x = method, y = classif.ce)) +
   geom_pointrange(aes(ymin = classif.ce.lower, ymax = classif.ce.upper), fatten = 1.4) +
-  coord_flip() +                        
+  coord_flip() +
   labs(x = NULL, y = "Classification Error") +
   theme_bw()
 ```
 
-The plot below shows the runtimes for the difference resampling methods: 
+The plot below shows the runtimes for the difference resampling methods:
 
 ```{r}
 #| code-fold: true
-ggplot(tbl, aes(x = method, y = runtime)) + 
+ggplot(tbl, aes(x = method, y = runtime)) +
   geom_point() +
   theme_bw()
 ```
