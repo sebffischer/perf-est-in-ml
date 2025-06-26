@@ -13,7 +13,7 @@ Load a simulated dataset with 10 clusters, each containing 25 observations:
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Load a previously saved dataset named 'dataclustered' from an R data file
-load("dataclustered.Rda")
+load("data/dataclustered.Rda")
 
 # Display the first few rows of the dataset
 head(dataclustered)
@@ -118,7 +118,7 @@ Load the simulated population data and draw the sample available to the analyst:
 set.seed(1234)
 
 # Load the full population (not available to the analyst in practice)
-load("population_data.Rda")
+load("data/population_data.Rda")
 
 # Number of units in population
 N <- nrow(population_data)
@@ -284,7 +284,7 @@ Standard repeated CV (**not** recommended; 7 folds x 10 repeats):
 # Create a repeated CV object
 cv <- rsmp("repeated_cv", repeats = 10, folds = 7)
 
-# Instantiate the CV splits on the current task 
+# Instantiate the CV splits on the current task
 cv$instantiate(task)
 
 # CV for random forests
@@ -338,12 +338,12 @@ Print MSEs of all variants for comparison:
 # Random forests: CV and out-of-sample validation without and with buffer
 mse_cv_rf           # MSE with standard CV
 mse_TSholdout_1s_rf # MSE with out-of-sample validation without buffer
-mse_TSholdout_2s_rf # MSE with out-of-sample validation with buffer 
+mse_TSholdout_2s_rf # MSE with out-of-sample validation with buffer
 
 # Linear models: CV and out-of-sample validation without and with buffer
 mse_cv_lm           # MSE with standard CV
 mse_TSholdout_1s_lm # MSE with out-of-sample validation without buffer
-mse_TSholdout_2s_lm # MSE with out-of-sample validation with buffer 
+mse_TSholdout_2s_lm # MSE with out-of-sample validation with buffer
 ```
 
 ## Hierarchically Structured Outcomes
@@ -352,7 +352,7 @@ Load a simulated dataset with a hierarchically structured outcome:
 
 ```{r, echo=TRUE, results="hold", message=FALSE, warning=FALSE}
 # Load the dataset (assumed to include a hierarchical class structure in 'y')
-load("datahier.Rda")
+load("data/datahier.Rda")
 
 # Display the first few rows of the dataset
 head(datahier)
@@ -398,7 +398,7 @@ set.seed(1234)
 # Create a repeated CV object: 2 repeats of 5-fold CV
 cv <- rsmp("repeated_cv", repeats = 2, folds = 5)
 
-# Instantiate the CV splits on the current task 
+# Instantiate the CV splits on the current task
 cv$instantiate(task)
 
 # Run the CV for the top-down classifier
@@ -422,7 +422,7 @@ Stratified repeated CV, using target variable for stratification (**recommended!
 set.seed(1234)
 
 # Use target variable for stratification
-task$col_roles$stratum <- task$target_names 
+task$col_roles$stratum <- task$target_names
 
 # Instantiate the CV splits after stratification
 cv$instantiate(task)
@@ -625,10 +625,10 @@ This method can be used in situations where observations are grouped into predef
 # IMPORTANT: The variable 'location' must not be included as a covariate in the task
 # ('location' was already removed before the task was created above).
 # In this resampling strategy, each fold corresponds to one unique value of 'location'.
-# Therefore, during training, the model will *not* see the level of 'location' that appear 
+# Therefore, during training, the model will *not* see the level of 'location' that appear
 # in the test fold.
-# If 'location' were included as a covariate (i.e., a factor), this would cause a failure 
-# at prediction time, since the model cannot handle previously unseen factor levels. 
+# If 'location' were included as a covariate (i.e., a factor), this would cause a failure
+# at prediction time, since the model cannot handle previously unseen factor levels.
 
 rs8 <- rsmp("custom_cv")
 rs8$instantiate(task, f = ecuador2_sf$location)
