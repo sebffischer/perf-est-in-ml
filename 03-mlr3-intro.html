@@ -3198,16 +3198,30 @@ Tip
 <h3 class="anchored" data-anchor-id="learner">Learner</h3>
 <p>A learner is a machine learning algorithm that can be <code>$train()</code>ed on a <code>Task</code> and be used to make <code>$predict()</code>ions on it. An overview of all learners is shown on our <a href="https://mlr-org.com/learners.html">website</a>. We can construct one by passing the identifier of the learner to the <code>lrn()</code> function.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>lrn_tree <span class="ot">&lt;-</span> <span class="fu">lrn</span>(<span class="st">&quot;classif.rpart&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>lrn_tree <span class="ot">&lt;-</span> <span class="fu">lrn</span>(<span class="st">&quot;classif.rpart&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>lrn_tree</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+── &lt;LearnerClassifRpart&gt; (classif.rpart): Classification Tree ──────────────────
+• Model: -
+• Parameters: xval=0
+• Packages: mlr3 and rpart
+• Predict Types: [response] and prob
+• Feature Types: logical, integer, numeric, factor, and ordered
+• Encapsulation: none (fallback: -)
+• Properties: importance, missings, multiclass, selected_features, twoclass,
+and weights
+• Other settings: use_weights = &#39;use&#39;</code></pre>
+</div>
 </div>
 <p>Next, we need to split the data into a training and test set and apply the learner on the former.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>split <span class="ot">&lt;-</span> <span class="fu">partition</span>(tsk_iris, <span class="at">ratio =</span> <span class="fl">0.8</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">train</span>(tsk_iris, <span class="at">row_ids =</span> split<span class="sc">$</span>train)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>split <span class="ot">&lt;-</span> <span class="fu">partition</span>(tsk_iris, <span class="at">ratio =</span> <span class="fl">0.8</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">train</span>(tsk_iris, <span class="at">row_ids =</span> split<span class="sc">$</span>train)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The trained model can be accessed via the <code>$model</code> slot of the learner:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(lrn_tree<span class="sc">$</span>model)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(lrn_tree<span class="sc">$</span>model)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>n= 120 
 
@@ -3223,12 +3237,12 @@ node), split, n, loss, yval, (yprob)
 </div>
 <p>To make predictions on the test set, we can use the <code>$predict()</code> method of the learner:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>predictions <span class="ot">&lt;-</span> lrn_tree<span class="sc">$</span><span class="fu">predict</span>(tsk_iris, <span class="at">row_ids =</span> split<span class="sc">$</span>test)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>predictions <span class="ot">&lt;-</span> lrn_tree<span class="sc">$</span><span class="fu">predict</span>(tsk_iris, <span class="at">row_ids =</span> split<span class="sc">$</span>test)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To make predictions on <code>data.frame</code>s, we can use the <code>$predict_newdata()</code> method of the learner:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>new_data <span class="ot">&lt;-</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, ]</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">predict_newdata</span>(new_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>new_data <span class="ot">&lt;-</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, ]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">predict_newdata</span>(new_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 ── &lt;PredictionClassif&gt; for 2 observations: ─────────────────────────────────────
@@ -3242,8 +3256,8 @@ node), split, n, loss, yval, (yprob)
 <h3 class="anchored" data-anchor-id="performance-evaluation">Performance Evaluation</h3>
 <p>To assess the quality of the predictions, we can use a <code>Measure</code>. <code>mlr3</code> comes with many predefined measures, and we can construct them by passing the name of the measure to the <code>msr()</code> function. Below, we construct the mean classification accuracy measure – which can only be applied to classification tasks – and use it to evaluate the predictions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>acc <span class="ot">&lt;-</span> <span class="fu">msr</span>(<span class="st">&quot;classif.acc&quot;</span>)</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>predictions<span class="sc">$</span><span class="fu">score</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>acc <span class="ot">&lt;-</span> <span class="fu">msr</span>(<span class="st">&quot;classif.acc&quot;</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>predictions<span class="sc">$</span><span class="fu">score</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>classif.acc 
   0.9333333 </code></pre>
@@ -3251,16 +3265,36 @@ node), split, n, loss, yval, (yprob)
 </div>
 <p>For more elaborate evaluation strategies, we can use <code>rsmp()</code> to define a <code>Resampling</code> strategy that can be executed using <code>resample()</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>rsmp_cv <span class="ot">&lt;-</span> <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">3</span>)</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">&lt;-</span> <span class="fu">resample</span>(</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">task       =</span> tsk_iris,</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner    =</span> lrn_tree,</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_cv</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Aggregate the results</span></span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>rr<span class="sc">$</span><span class="fu">aggregate</span>(<span class="fu">msr</span>(<span class="st">&quot;classif.acc&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>rsmp_cv <span class="ot">&lt;-</span> <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">3</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">&lt;-</span> <span class="fu">resample</span>(</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">task       =</span> tsk_iris,</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner    =</span> lrn_tree,</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_cv</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>rr</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+── &lt;ResampleResult&gt; with 3 resampling iterations ───────────────────────────────
+ task_id    learner_id resampling_id iteration     prediction_test warnings
+    iris classif.rpart            cv         1 &lt;PredictionClassif&gt;        0
+    iris classif.rpart            cv         2 &lt;PredictionClassif&gt;        0
+    iris classif.rpart            cv         3 &lt;PredictionClassif&gt;        0
+ errors
+      0
+      0
+      0</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>rr<span class="sc">$</span><span class="fu">score</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   task_id    learner_id resampling_id iteration classif.acc
+    &lt;char&gt;        &lt;char&gt;        &lt;char&gt;     &lt;int&gt;       &lt;num&gt;
+1:    iris classif.rpart            cv         1        0.96
+2:    iris classif.rpart            cv         2        0.96
+3:    iris classif.rpart            cv         3        0.92
+Hidden columns: task, learner, resampling, prediction_test</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>rr<span class="sc">$</span><span class="fu">aggregate</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>classif.acc 
   0.9466667 </code></pre>
@@ -3274,82 +3308,55 @@ node), split, n, loss, yval, (yprob)
 <ol type="1">
 <li><p><strong>Define the Search Space</strong>: Specify the range and distribution of hyperparameters to explore.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3tuning)</span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">configure</span>(</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">cp =</span> <span class="fu">to_tune</span>(<span class="at">lower =</span> <span class="fl">0.001</span>, <span class="at">upper =</span> <span class="fl">0.1</span>),</span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">maxdepth =</span> <span class="fu">to_tune</span>(<span class="at">lower =</span> <span class="dv">1</span>, <span class="at">upper =</span> <span class="dv">30</span>)</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3tuning)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">configure</span>(</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">cp =</span> <span class="fu">to_tune</span>(<span class="at">lower =</span> <span class="fl">0.001</span>, <span class="at">upper =</span> <span class="fl">0.1</span>),</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">maxdepth =</span> <span class="fu">to_tune</span>(<span class="at">lower =</span> <span class="dv">1</span>, <span class="at">upper =</span> <span class="dv">30</span>)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 <li><p><strong>Choose a Resampling Strategy</strong>: Determine how to evaluate each hyperparameter configuration’s performance.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>rsmp_tune <span class="ot">&lt;-</span> <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>rsmp_tune <span class="ot">&lt;-</span> <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 <li><p><strong>Select a Tuner</strong>: Decide on the algorithm that will search through the hyperparameter space.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>tuner <span class="ot">&lt;-</span> <span class="fu">tnr</span>(<span class="st">&quot;random_search&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>tuner <span class="ot">&lt;-</span> <span class="fu">tnr</span>(<span class="st">&quot;random_search&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 <li><p><strong>Select a Measure</strong>: Define the metric to optimize during tuning.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>msr_tune <span class="ot">&lt;-</span> <span class="fu">msr</span>(<span class="st">&quot;classif.acc&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>msr_tune <span class="ot">&lt;-</span> <span class="fu">msr</span>(<span class="st">&quot;classif.acc&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 <li><p><strong>Execute Tuning</strong>: Run the tuning process to find the optimal hyperparameters. Here we also specify our budget of 10 evaluations.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>tune_result <span class="ot">&lt;-</span> <span class="fu">tune</span>(</span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">task =</span> tsk_iris,</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner =</span> lrn_tree,</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_tune,</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">measure =</span> msr_tune,</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">tuner =</span> tuner,</span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">term_evals =</span> <span class="dv">10</span>L</span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>tune_result <span class="ot">&lt;-</span> <span class="fu">tune</span>(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">task =</span> tsk_iris,</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner =</span> lrn_tree,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_tune,</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">measure =</span> msr_tune,</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">tuner =</span> tuner,</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">term_evals =</span> <span class="dv">10</span>L</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 <li><p><strong>Apply the Best Hyperparameters</strong>: Update the learner with the best-found hyperparameters and retrain the model.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span>param_set<span class="sc">$</span>values <span class="ot">&lt;-</span> tune_result<span class="sc">$</span>result_learner_param_vals</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">train</span>(tsk_iris)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span>param_set<span class="sc">$</span>values <span class="ot">&lt;-</span> tune_result<span class="sc">$</span>result_learner_param_vals</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>lrn_tree<span class="sc">$</span><span class="fu">train</span>(tsk_iris)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></li>
 </ol>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Quiz: Tuning Performance
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p><strong>Question 1</strong>: Estimating the performance of a tuned model:</p>
-<p>Through the tuning archive, we can access the performance of the best-found hyperparameter configuration.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>tune_result<span class="sc">$</span>archive<span class="sc">$</span>data[<span class="fu">order</span>(classif.acc, <span class="at">decreasing =</span> <span class="cn">TRUE</span>), ][<span class="dv">1</span>, classif.acc]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 0.94</code></pre>
-</div>
-</div>
-<p>Do you think this is a good estimate for the performance of the final model? Explain your answer.</p>
-<details>
-<summary>
-Click for answer
-</summary>
-One reason why we would expect the performance of the final model to be worse than the performance of the best-found hyperparameter configuration is due to <em>optimization bias</em>: We choose the model configuration with the highest validation performance. This selection process biases the result since the chosen model is the best among several trials that are all affected by randomness.
-</details>
-</div>
-</div>
 <p>These two steps can also be encapsulated in the <code>AutoTuner</code> class, which first finds the best hyperparameters and then trains the model with them.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>at <span class="ot">&lt;-</span> <span class="fu">auto_tuner</span>(</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner =</span> lrn_tree,</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_tune,</span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">measure =</span> msr_tune,</span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">term_evals =</span> <span class="dv">10</span>L,</span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">tuner =</span> tuner</span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>at <span class="ot">&lt;-</span> <span class="fu">auto_tuner</span>(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">learner =</span> lrn_tree,</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">resampling =</span> rsmp_tune,</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">measure =</span> msr_tune,</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">term_evals =</span> <span class="dv">10</span>L,</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">tuner =</span> tuner</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The <code>AutoTuner</code> can be used just like any other <code>Learner</code>. To get a valid performance estimate of the tuning process, we can <code>resample()</code> it on the task. This is called <em>nested resampling</em>: the outer resampling is for evaluation and the inner resampling is for tuning.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">&lt;-</span> <span class="fu">resample</span>(tsk_iris, at, rsmp_tune)</span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>rr<span class="sc">$</span><span class="fu">aggregate</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">&lt;-</span> <span class="fu">resample</span>(tsk_iris, at, rsmp_tune)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>rr<span class="sc">$</span><span class="fu">aggregate</span>(acc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>classif.acc 
   0.9466667 </code></pre>
@@ -3360,12 +3367,12 @@ One reason why we would expect the performance of the final model to be worse th
 <h3 class="anchored" data-anchor-id="learning-pipelines">Learning Pipelines</h3>
 <p>In many cases, we don’t only fit a single learner but a whole learning pipeline. Common use cases include the preprocessing of the data, e.g., for imputing missing values, scaling the data, or encoding categorical features, but many other operations are possible. The <code>mlr3</code> extension <a href="https://mlr3pipelines.mlr-org.com/"><code>mlr3pipelines</code></a> is a toolbox for defining such learning pipelines. Its core building block is the <code>PipeOp</code> that can be constructed using the <code>po()</code> function.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3pipelines)</span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">po</span>(<span class="st">&quot;pca&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3pipelines)</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">po</span>(<span class="st">&quot;pca&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Just like a learner, it has a <code>$train()</code> and <code>$predict()</code> method, and we can apply it to a <code>Task</code> using these methods.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>pca<span class="sc">$</span><span class="fu">train</span>(<span class="fu">list</span>(tsk_iris))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>pca<span class="sc">$</span><span class="fu">train</span>(<span class="fu">list</span>(tsk_iris))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>$output
 
@@ -3376,7 +3383,7 @@ One reason why we would expect the performance of the final model to be worse th
 • Features (4):
   • dbl (4): PC1, PC2, PC3, PC4</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>pca<span class="sc">$</span><span class="fu">predict</span>(<span class="fu">list</span>(tsk_iris))[[<span class="dv">1</span>L]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>pca<span class="sc">$</span><span class="fu">predict</span>(<span class="fu">list</span>(tsk_iris))[[<span class="dv">1</span>L]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 ── &lt;TaskClassif&gt; (150x5) ───────────────────────────────────────────────────────
@@ -3389,9 +3396,9 @@ One reason why we would expect the performance of the final model to be worse th
 </div>
 <p>Usually, such <code>PipeOp</code>s are combined with a <code>Learner</code> into a full learning <code>Graph</code>. This is possible using the <code>%&gt;&gt;%</code> chain operator.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3pipelines)</span>
-<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>graph <span class="ot">&lt;-</span> <span class="fu">po</span>(<span class="st">&quot;pca&quot;</span>) <span class="sc">%&gt;&gt;%</span> <span class="fu">lrn</span>(<span class="st">&quot;classif.rpart&quot;</span>)</span>
-<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(graph)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3pipelines)</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>graph <span class="ot">&lt;-</span> <span class="fu">po</span>(<span class="st">&quot;pca&quot;</span>) <span class="sc">%&gt;&gt;%</span> <span class="fu">lrn</span>(<span class="st">&quot;classif.rpart&quot;</span>)</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(graph)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Graph with 2 PipeOps:
             ID         State      sccssors prdcssors
@@ -3399,7 +3406,7 @@ One reason why we would expect the performance of the final model to be worse th
            pca &lt;&lt;UNTRAINED&gt;&gt; classif.rpart          
  classif.rpart &lt;&lt;UNTRAINED&gt;&gt;                     pca</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>graph<span class="sc">$</span><span class="fu">plot</span>(<span class="at">horizontal =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>graph<span class="sc">$</span><span class="fu">plot</span>(<span class="at">horizontal =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -3410,8 +3417,8 @@ One reason why we would expect the performance of the final model to be worse th
 </div>
 <p>The resulting <code>Graph</code> can be converted back into a <code>Learner</code> using the <code>as_learner()</code> function and used just like any other <code>Learner</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>glrn <span class="ot">&lt;-</span> <span class="fu">as_learner</span>(graph)</span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>glrn<span class="sc">$</span><span class="fu">train</span>(tsk_iris)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>glrn <span class="ot">&lt;-</span> <span class="fu">as_learner</span>(graph)</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>glrn<span class="sc">$</span><span class="fu">train</span>(tsk_iris)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="parallelization" class="level3">
@@ -3419,26 +3426,16 @@ One reason why we would expect the performance of the final model to be worse th
 <p>In order to speed up computations in <code>mlr3</code>, there are various approaches:</p>
 <ol type="1">
 <li>Use a <code>Learner</code>’s internal parallelization capapabilities, which is independent from <code>mlr3</code> and which can be set via the <code>set_threads()</code> function.</li>
-<li>Use <code>future</code> (or soon also <code>mirai</code>) to parallelize the execution of a resampling or a benchmark.</li>
-<li>Soon it will be possible to use <code>mirai</code> as a plug-in replacement for <code>future</code>, which is significantly faster.</li>
+<li>Use <code>future</code> to parallelize the execution of a resampling or a benchmark.</li>
+<li>Soon it will be possible to use <code>mirai</code> as a plug-in replacement for <code>future</code>, which is significantly faster and easier to configure.</li>
 <li>Use <code>mlr3batchmark</code> for parallelization on HPC clusters.</li>
 </ol>
 <p>You can read <a href="https://mlr3book.mlr-org.com/chapters/chapter10/advanced_technical_aspects_of_mlr3.html#sec-parallelization">Chapter 10</a> and <a href="https://mlr3book.mlr-org.com/chapters/chapter11/large-scale_benchmarking.html#sec-hpc-exec">Chapter 11</a> of the <code>mlr3</code> book on that. Here, we will briefly demonstrate how to parallelize a resampling using <code>future</code>.</p>
 <p>In the simplest scenario (no nested parallelization), we only need to call a single functions from future and specify the number of workers:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in checkNumberOfLocalWorkers(workers): Careful, you are setting up 10
-localhost parallel workers with only 8 CPU cores available for this R process
-(per &#39;system&#39;), which could result in a 125% load. The soft limit is set to
-100%. Overusing the CPUs has negative impact on the current R process, but also
-on all other processes of yours and others running on the same machine. See
-help(&quot;parallelly.maxWorkers.localhost&quot;, package = &quot;parallelly&quot;) for further
-explanations and how to override the soft limit that triggered this warning</code></pre>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">5</span>)</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">=</span> <span class="fu">resample</span>(tsk_iris, lrn_tree, <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>rr <span class="ot">=</span> <span class="fu">resample</span>(tsk_iris, lrn_tree, <span class="fu">rsmp</span>(<span class="st">&quot;cv&quot;</span>, <span class="at">folds =</span> <span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>Note that you want to pay attention to any NEWS about the <code>mirai</code> integration to <code>mlr3</code>, which will really simplify some configuration options and make everything faster.</p>
 </section>
 </section>
 

@@ -56,6 +56,7 @@ We can construct one by passing the identifier of the learner to the `lrn()` fun
 
 ```{r}
 lrn_tree <- lrn("classif.rpart")
+lrn_tree
 ```
 
 Next, we need to split the data into a training and test set and apply the learner on the former.
@@ -99,9 +100,11 @@ rr <- resample(
   learner    = lrn_tree,
   resampling = rsmp_cv
 )
+rr
 
-# Aggregate the results
-rr$aggregate(msr("classif.acc"))
+rr$score(acc)
+
+rr$aggregate(acc)
 ```
 
 ### Hyperparameter Tuning
@@ -157,27 +160,6 @@ We will now demonstrate how to tune the hyperparameters of the `classif.rpart` l
    lrn_tree$param_set$values <- tune_result$result_learner_param_vals
    lrn_tree$train(tsk_iris)
    ```
-
-::: {.callout-note}
-## Quiz: Tuning Performance
-
-**Question 1**: Estimating the performance of a tuned model:
-
-Through the tuning archive, we can access the performance of the best-found hyperparameter configuration.
-
-```{r}
-tune_result$archive$data[order(classif.acc, decreasing = TRUE), ][1, classif.acc]
-```
-
-Do you think this is a good estimate for the performance of the final model? Explain your answer.
-
-<details>
-<summary>Click for answer</summary>
-One reason why we would expect the performance of the final model to be worse than the performance of the best-found hyperparameter configuration is due to *optimization bias*:
-We choose the model configuration with the highest validation performance.
-This selection process biases the result since the chosen model is the best among several trials that are all affected by randomness.
-</details>
-:::
 
 These two steps can also be encapsulated in the `AutoTuner` class, which first finds the best hyperparameters and then trains the model with them.
 
@@ -242,8 +224,8 @@ glrn$train(tsk_iris)
 In order to speed up computations in `mlr3`, there are various approaches:
 
 1. Use a `Learner`'s internal parallelization capapabilities, which is independent from `mlr3` and which can be set via the `set_threads()` function.
-1. Use `future` (or soon also `mirai`) to parallelize the execution of a resampling or a benchmark.
-1. Soon it will be possible to use `mirai` as a plug-in replacement for `future`, which is significantly faster.
+1. Use `future` to parallelize the execution of a resampling or a benchmark.
+1. Soon it will be possible to use `mirai` as a plug-in replacement for `future`, which is significantly faster and easier to configure.
 1. Use `mlr3batchmark` for parallelization on HPC clusters.
 
 You can read [Chapter 10](https://mlr3book.mlr-org.com/chapters/chapter10/advanced_technical_aspects_of_mlr3.html#sec-parallelization) and [Chapter 11](https://mlr3book.mlr-org.com/chapters/chapter11/large-scale_benchmarking.html#sec-hpc-exec) of the `mlr3` book on that.
@@ -253,8 +235,6 @@ In the simplest scenario (no nested parallelization), we only need to call a sin
 
 
 ```{r}
-future::plan("multisession", workers = 10)
+future::plan("multisession", workers = 5)
 rr = resample(tsk_iris, lrn_tree, rsmp("cv", folds = 10))
 ```
-
-Note that you want to pay attention to any NEWS about the `mirai` integration to `mlr3`, which will really simplify some configuration options and make everything faster.

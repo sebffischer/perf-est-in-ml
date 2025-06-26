@@ -1,5 +1,6 @@
 ---
-title: "Inference on the GE with mlr3"
+title: "Inference for the Generalization Error with mlr3"
+author: "Sebastian Fischer"
 format:
   html:
     embed-resources: true
@@ -18,7 +19,6 @@ To follow this tutorial, you need to install the following packages:
 install.packages(c(
   "mlr3",
   "mlr3inferr",
-  "mlr3pipelines",
   "ggplot2"
 ))
 ```
@@ -33,19 +33,10 @@ task = tsk("german_credit")
 task
 ```
 
-As the learning algorithm, we will go with a simple classification tree with standard hyperparamter configurations.
+As the learning algorithm, we will go with a simple classification tree with the standard hyperparamter configuration.
 
 ```{r}
 learner = lrn("classif.rpart")
-```
-
-In order to avoid any errors (like unseen factor levels), we perform some preprocessing before training the logistic regression.
-For more information, see `help(mlr_graphs_robustify)`.
-
-```{r}
-library(mlr3pipelines)
-learner = as_learner(po("imputehist") %>>% learner)
-learner$id = "log_reg"
 ```
 
 In order to be able to apply probability-based measures, we instruct the `Learner` to make probability predictions:
@@ -56,9 +47,9 @@ learner$predict_type = "prob"
 
 ## Using the Inference Methods
 
-### Simple Holdout Method
+### Holdout Method
 
-In order to apply the simple Holdout-based CI method, we define the resampling method, where we use $90%$ of the data for training, and run the experiment:
+In order to apply the simple Holdout-based CI method, we define the resampling method, where we use $90\%$ of the data for training, and run the experiment:
 
 ```{r}
 rsmp_holdout = rsmp("holdout", ratio = 0.9)
@@ -109,7 +100,7 @@ msr_ci_holdout = msr("ci.holdout",
 ```
 
 In order to construct a confidence interval, we can now simply call `$aggregate()` on the resample result and pass the CI measure:
-The result is a named vector with names `c("<msr-id>", "<msr-id>.lower", "<msr-id>.upper")`.
+The result is a vector of length three, containing the point prediction, as well as the lower and upper boundary.
 
 ```{r}
 ci_holdout = rr_holdout$aggregate(msr_ci_holdout)
@@ -120,7 +111,7 @@ ci_holdout
 ### Corrected T
 
 To apply the *Corrected T* method, we need to use `rsmp("subsampling")` for our resample experiment.
-We use 90% of the data for training and conduct 25 repetitions:
+We use 90% of the data for training and repeat it 25 times.
 
 ```{r}
 rsmp_subs = rsmp("subsampling",
@@ -131,8 +122,8 @@ rsmp_subs
 rr_subs = resample(task, learner, rsmp_subs)
 ```
 
-We could now again define the `msr("ci.cor_t")` and pass it to the resample result's `$aggregate()` method.
-Another option is to use the `msr("ci")` measure, which auto-detects the resampling method and applies the appriopriate CI method:
+We could now define the `msr("ci.cor_t")` measure and pass it to the resample result's `$aggregate()` method.
+Another option is to use the `msr("ci")` measure, which auto-detects the resampling method and applies the appropriate CI method:
 
 ```{r}
 ci = msr("ci", measure = msr("classif.ce"))
@@ -140,7 +131,7 @@ ci_cort = rr_subs$aggregate(ci)
 ci_cort
 ```
 
-For this resampling scheme, we could also use the AUC measure, which is not based on pointwise losses:
+For this resampling scheme, we could also use the AUC measure, which is not based on pointwise losses, as this is supported by the Corrected T method.
 
 ```{r}
 rr_subs$aggregate(msr("ci.cor_t", measure = msr("classif.auc")))
@@ -149,7 +140,7 @@ rr_subs$aggregate(msr("ci.cor_t", measure = msr("classif.auc")))
 ### Conservative Z
 
 To use the *Conservative Z* method, the resample experiment needs to use the *Paired Subsampling* resampling scheme.
-It allows to define the repetitions of the Subsampling scheme (`repeats_in`), how often to split the data into two halves (`repeats_out`), as well as the `ratio`.
+It allows to define the repetitions of the Subsampling scheme (`repeats_in`), how often to split the data into two halves (`repeats_out`), as well as the training data `ratio`.
 The total number of resampling iterations (i.e. train-test splits) can be accessed via the `$iters` field.
 The default configuration of Paired Subsampling is the one suggested by Nadeau and Bengio (1999) where they introduced the method.
 It uses 315 iterations, which can be prohibitively expensive, especially when used in comination with hyperparameter tuning.
@@ -213,7 +204,8 @@ set(tbl, j = "runtime", value = sapply(list(
 ))
 ```
 
-In the figure below, we show all CIs side by side:
+In the figure below, we show all CIs side by side.
+We see that the Holdout method has clearly the widest CI, and that the "naive" CV method the most narrow one (because it ignores the correlation).
 
 ```{r}
 #| code-fold: true
@@ -222,10 +214,10 @@ ggplot(tbl, aes(x = method, y = classif.ce)) +
   geom_pointrange(aes(ymin = classif.ce.lower, ymax = classif.ce.upper), fatten = 1.4) +
   coord_flip() +                        
   labs(x = NULL, y = "Classification Error") +
-  theme_minimal()
+  theme_bw()
 ```
 
-However, the different resampling schemes had different runtime requirements:
+The plot below shows the runtimes for the difference resampling methods: 
 
 ```{r}
 #| code-fold: true
@@ -233,8 +225,3 @@ ggplot(tbl, aes(x = method, y = runtime)) +
   geom_point() +
   theme_bw()
 ```
-
-
-
-
-
